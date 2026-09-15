@@ -1,4 +1,4 @@
-# 🗣️ Tanglish Content Moderator 🤖
+# Tanglish Content Moderator
 
 A real-time classifier that detects trolling / offensive comments written
 in **Tanglish** (Tamil-English code-mixed text) — the way most Tamil
@@ -110,5 +110,3 @@ papers stop short of.
   using the same pipeline — the dataset already includes both
 - Real deployment as a browser extension or platform-side webhook
 - On-device inference for privacy-preserving moderation
-
-
