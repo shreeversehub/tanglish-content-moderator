@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tanglish Content Moderator — Live Demo</title>
+<style>
+  :root {
+    --navy: #1E2761;
+    --amber: #F5A623;
+    --ok: #1F9D55;
+    --bad: #D64545;
+    --bg: #F7F9FC;
+    --text: #1B1B2A;
+    --muted: #6B7280;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    background: var(--navy);
+    color: white;
+    padding: 28px 32px;
+  }
+  header h1 { margin: 0 0 4px 0; font-size: 22px; }
+  header p { margin: 0; color: #B9C3E8; font-size: 14px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    max-width: 1100px;
+    margin: 28px auto;
+    padding: 0 20px;
+  }
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .panel h2 {
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--navy);
+    margin: 0 0 14px 0;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 70px;
+    border: 1px solid #DCE3EF;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+  }
+  button {
+    margin-top: 10px;
+    background: var(--navy);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button:hover { background: #263875; }
+
+  .result {
+    margin-top: 16px;
+    padding: 14px;
+    border-radius: 8px;
+    display: none;
+  }
+  .result.ok { background: #E9F9EF; border: 1px solid var(--ok); display: block; }
+  .result.bad { background: #FDECEC; border: 1px solid var(--bad); display: block; }
+  .result .label { font-weight: 700; font-size: 15px; }
+  .result .label.ok-text { color: var(--ok); }
+  .result .label.bad-text { color: var(--bad); }
+  .result .conf { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .signals {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .signal-chip {
+    background: white;
+    border: 1px solid #E3E8F0;
+    border-radius: 12px;
+    padding: 3px 9px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: monospace;
+  }
+
+  .log-item {
+    border-bottom: 1px solid #EEF1F6;
+    padding: 10px 0;
+    font-size: 13px;
+  }
+  .log-item:last-child { border-bottom: none; }
+  .log-text { margin-bottom: 4px; }
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    margin-right: 6px;
+  }
+  .badge.bad { background: var(--bad); color: white; }
+  .badge.ok { background: var(--ok); color: white; }
+  .empty-log { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Tanglish Content Moderator</h1>
+  <p>Live demo — flags trolling / offensive Tanglish (Tamil-English) comments in real time</p>
+</header>
+
+<div class="layout">
+  <div class="panel">
+    <h2>Post a Comment</h2>
+    <textarea id="commentInput" placeholder="Type a Tanglish comment... e.g. 'semma video da'"></textarea>
+    <br>
+    <button onclick="postComment()">Post</button>
+
+    <div id="result" class="result">
+      <div class="label" id="resultLabel"></div>
+      <div class="conf" id="resultConf"></div>
+      <div class="signals" id="resultSignals"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Moderator Dashboard</h2>
+    <div id="log"><div class="empty-log">No comments yet.</div></div>
+  </div>
+</div>
+
+<script>
+async function postComment() {
+  const input = document.getElementById('commentInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const res = await fetch('/api/comment', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({text})
+  });
+  const data = await res.json();
+  showResult(data);
+  input.value = '';
+  loadLog();
+}
+
+function showResult(data) {
+  const box = document.getElementById('result');
+  const label = document.getElementById('resultLabel');
+  const conf = document.getElementById('resultConf');
+  const signals = document.getElementById('resultSignals');
+
+  const isBad = data.label === 'Offensive';
+  box.className = 'result ' + (isBad ? 'bad' : 'ok');
+  label.className = 'label ' + (isBad ? 'bad-text' : 'ok-text');
+  label.textContent = isBad ? '🚫 Flagged — Offensive' : '✅ Safe — Not Offensive';
+  conf.textContent = `Confidence: ${(data.confidence * 100).toFixed(1)}%`;
+
+  signals.innerHTML = '';
+  (data.top_signals || []).forEach(s => {
+    const chip = document.createElement('span');
+    chip.className = 'signal-chip';
+    chip.textContent = s.ngram.trim();
+    signals.appendChild(chip);
+  });
+}
+
+async function loadLog() {
+  const res = await fetch('/api/log');
+  const items = await res.json();
+  const logDiv = document.getElementById('log');
+  if (items.length === 0) {
+    logDiv.innerHTML = '<div class="empty-log">No comments yet.</div>';
+    return;
+  }
+  logDiv.innerHTML = items.map(item => `
+    <div class="log-item">
+      <span class="badge ${item.label === 'Offensive' ? 'bad' : 'ok'}">${item.label}</span>
+      <span class="log-text">${escapeHtml(item.text)}</span>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+loadLog();
+</script>
+
+</body>
+</html>
